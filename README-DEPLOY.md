@@ -14,7 +14,10 @@
 - **Dockerfile**: `Dockerfile`
 
 #### Build Otimizado:
-O Dockerfile foi otimizado para usar single-stage build, evitando problemas de multi-stage build complexos. Isso garante maior compatibilidade com diferentes plataformas de deploy.
+O Dockerfile foi otimizado com:
+- Single-stage build para máxima compatibilidade
+- Script de entrada inteligente (entrypoint.sh) que detecta automaticamente se deve usar versão compilada ou TypeScript
+- Fallback robusto para garantir que a aplicação sempre execute
 
 #### Variáveis de Ambiente Necessárias:
 ```

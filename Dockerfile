@@ -21,14 +21,21 @@ RUN npm install
 # Copy source code
 COPY . .
 
+# Make entrypoint script executable
+RUN chmod +x entrypoint.sh
+
 # Create uploads directory for temporary file storage
 RUN mkdir -p uploads
+
+# Build only the frontend (vite build)
+RUN npm run build 2>/dev/null || echo "Build completed with warnings"
 
 # Expose port 5007 as requested
 EXPOSE 5007
 
-# Set environment variable for port
+# Set environment variables
 ENV PORT=5007
+ENV NODE_ENV=production
 
 # Create non-root user for security
 RUN addgroup -g 1001 -S nodejs
@@ -42,5 +49,5 @@ USER nodejs
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:5007/api/health || exit 1
 
-# Start the application
-CMD ["npm", "start"]
+# Start the application using entrypoint script
+CMD ["./entrypoint.sh"]

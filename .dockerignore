@@ -21,6 +21,9 @@ README.md
 replit.nix
 .replit.md
 
+# Keep entrypoint script
+!entrypoint.sh
+
 # Uploads directory (will be created in container)
 uploads/*
 
