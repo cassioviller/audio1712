@@ -17,15 +17,26 @@ export interface TranscriptionResult {
  * @param audioFilePath - Path to the audio file to transcribe
  * @returns Promise containing transcription text and duration
  */
-export async function transcribeAudio(audioFilePath: string): Promise<TranscriptionResult> {
+export async function transcribeAudio(audioFilePath: string, originalFilename?: string): Promise<TranscriptionResult> {
   try {
     // Verify file exists
     if (!fs.existsSync(audioFilePath)) {
       throw new Error("Arquivo de áudio não encontrado.");
     }
 
+    // If we have an original filename, create a temporary file with the correct extension
+    let fileToTranscribe = audioFilePath;
+    if (originalFilename) {
+      const path = await import('path');
+      const extension = path.extname(originalFilename);
+      if (extension) {
+        fileToTranscribe = audioFilePath + extension;
+        fs.copyFileSync(audioFilePath, fileToTranscribe);
+      }
+    }
+
     // Create read stream for the audio file
-    const audioReadStream = fs.createReadStream(audioFilePath);
+    const audioReadStream = fs.createReadStream(fileToTranscribe);
 
     // Call OpenAI Whisper API for transcription
     const transcription = await openai.audio.transcriptions.create({
@@ -34,6 +45,11 @@ export async function transcribeAudio(audioFilePath: string): Promise<Transcript
       response_format: "json",
       language: "pt", // Portuguese language hint for better accuracy
     });
+
+    // Clean up temporary file if we created one
+    if (fileToTranscribe !== audioFilePath && fs.existsSync(fileToTranscribe)) {
+      fs.unlinkSync(fileToTranscribe);
+    }
 
     // Validate transcription result
     if (!transcription.text || transcription.text.trim().length === 0) {
@@ -66,6 +82,9 @@ export async function transcribeAudio(audioFilePath: string): Promise<Transcript
     }
     
     if (error.status === 400) {
+      if (originalFilename && originalFilename.toLowerCase().endsWith('.m4a')) {
+        throw new Error("Este arquivo M4A não é compatível com o serviço de transcrição. Tente converter o arquivo para MP3 ou WAV antes de fazer o upload.");
+      }
       throw new Error("Formato de arquivo não suportado ou arquivo corrompido.");
     }
     

@@ -34,8 +34,23 @@ export function FileUpload({
 
   const handleFileSelect = (file: File) => {
     // Validate file type
-    const allowedTypes = ['audio/mpeg', 'audio/wav', 'audio/x-m4a', 'audio/mp4'];
-    if (!allowedTypes.includes(file.type)) {
+    const allowedTypes = [
+      'audio/mpeg', 
+      'audio/wav', 
+      'audio/x-m4a', 
+      'audio/mp4',
+      'audio/m4a',
+      'audio/mp3',
+      'audio/aac'
+    ];
+    
+    // Also check file extension as backup
+    const allowedExtensions = ['.mp3', '.wav', '.m4a', '.mp4', '.aac'];
+    const hasValidExtension = allowedExtensions.some(ext => 
+      file.name.toLowerCase().endsWith(ext)
+    );
+    
+    if (!allowedTypes.includes(file.type) && !hasValidExtension) {
       onUploadError('Formato de arquivo não suportado. Use MP3, WAV ou M4A.');
       return;
     }
