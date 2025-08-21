@@ -83,3 +83,24 @@ Preferred communication style: Simple, everyday language.
 - **Zod**: Schema validation for type-safe data parsing
 
 The application follows a modern full-stack architecture with clear separation of concerns, comprehensive error handling, and a focus on user experience. The modular component structure and type-safe development approach ensure maintainability and scalability.
+
+## Docker Deployment Configuration
+
+### Docker Setup
+- **Dockerfile**: Optimized Node.js 18 Alpine-based container
+- **Port**: Configured for port 5007 (customizable via ENV)
+- **Health Check**: Available at `/api/health` endpoint
+- **Build**: Multi-stage build with production optimizations
+
+### EasyPanel Deployment
+- **Repository**: Ready for GitHub integration
+- **Environment Variables**: OPENAI_API_KEY, NODE_ENV, PORT
+- **Resources**: Recommended 0.5-1 CPU core, 512MB-1GB RAM
+- **Storage**: 1GB for temporary audio file processing
+
+### Recent Changes (2025-08-21)
+- ✅ Fixed M4A file compatibility with OpenAI Whisper API
+- ✅ Added Docker configuration for production deployment
+- ✅ Implemented health check endpoint for monitoring
+- ✅ Created EasyPanel deployment documentation
+- ✅ Optimized error handling for Portuguese language support

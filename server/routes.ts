@@ -99,7 +99,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.error("Transcription error:", transcriptionError);
         
         return res.status(500).json({ 
-          error: transcriptionError.message || "Erro ao processar o áudio. Verifique se o arquivo não está corrompido e tente novamente." 
+          error: (transcriptionError as Error).message || "Erro ao processar o áudio. Verifique se o arquivo não está corrompido e tente novamente." 
         });
       }
 
@@ -150,6 +150,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error("Get transcription error:", error);
       res.status(500).json({ error: "Erro ao buscar transcrição." });
     }
+  });
+
+  // Health check endpoint for Docker
+  app.get('/api/health', (req, res) => {
+    res.status(200).json({ 
+      status: 'healthy', 
+      timestamp: new Date().toISOString(),
+      service: 'audio-transcription-api'
+    });
   });
 
   const httpServer = createServer(app);
