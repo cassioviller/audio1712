@@ -15,9 +15,19 @@
 
 #### Build Otimizado:
 O Dockerfile foi otimizado com:
-- Single-stage build para máxima compatibilidade
-- Script de entrada inteligente (entrypoint.sh) que detecta automaticamente se deve usar versão compilada ou TypeScript
-- Fallback robusto para garantir que a aplicação sempre execute
+- **Node.js 20 Alpine** para máxima compatibilidade e performance
+- **Single-stage build** para máxima compatibilidade com EasyPanel
+- **Script de entrada inteligente** (entrypoint.sh) que:
+  - Detecta automaticamente se deve usar versão compilada ou TypeScript
+  - Verifica se a API key do OpenAI está configurada
+  - Cria diretórios necessários automaticamente
+  - Fornece logs detalhados para debugging
+
+#### Correções de Compatibilidade:
+- ✅ **Erro EPR_INVALID_ARG_TYPE** corrigido (compatibilidade Node.js)
+- ✅ **Health check funcional** em `/api/health`
+- ✅ **Fallback automático** entre build compilado e TypeScript
+- ✅ **Logs informativos** para debugging em produção
 
 #### Variáveis de Ambiente Necessárias:
 ```
