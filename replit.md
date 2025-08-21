@@ -100,7 +100,9 @@ The application follows a modern full-stack architecture with clear separation o
 
 ### Recent Changes (2025-08-21)
 - ✅ Fixed M4A file compatibility with OpenAI Whisper API
-- ✅ Added Docker configuration for production deployment
-- ✅ Implemented health check endpoint for monitoring
+- ✅ Added Docker configuration for production deployment (porta 5007)
+- ✅ Implemented health check endpoint for monitoring (/api/health)
 - ✅ Created EasyPanel deployment documentation
 - ✅ Optimized error handling for Portuguese language support
+- ✅ Corrected Docker build issues with single-stage approach
+- ✅ Verified health check functionality returning JSON status

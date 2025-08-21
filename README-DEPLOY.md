@@ -11,12 +11,10 @@
 #### Configurações Básicas:
 - **Porta**: `5007`
 - **Build Context**: `/`
-- **Dockerfile**: `Dockerfile` (ou `Dockerfile.simple` se houver problemas de build)
+- **Dockerfile**: `Dockerfile`
 
-#### Solução para Problemas de Build:
-Se encontrar erro "vite: not found" durante o build:
-- Use `Dockerfile.simple` que evita problemas com dependências de desenvolvimento
-- Ou certifique-se de que todas as dependências estão sendo instaladas corretamente
+#### Build Otimizado:
+O Dockerfile foi otimizado para usar single-stage build, evitando problemas de multi-stage build complexos. Isso garante maior compatibilidade com diferentes plataformas de deploy.
 
 #### Variáveis de Ambiente Necessárias:
 ```
@@ -71,9 +69,9 @@ Após o deploy, acesse:
 ### 6. Logs e Troubleshooting:
 
 #### Problemas Comuns:
-1. **Erro "vite: not found"**:
-   - Solução: Use `Dockerfile.simple` em vez de `Dockerfile`
-   - Ou configure build-arg no EasyPanel para usar npm install em vez de npm ci --only=production
+1. **Problemas de build**:
+   - O Dockerfile usa single-stage build para máxima compatibilidade
+   - Todas as dependências são instaladas com `npm install`
 
 2. **Erro de health check**:
    - Verifique se a porta 5007 está configurada corretamente

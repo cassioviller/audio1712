@@ -1,48 +1,25 @@
-# Multi-stage build for smaller production image
-FROM node:18-alpine AS builder
+# Single-stage build - mais simples e confiável para EasyPanel
+FROM node:18-alpine
 
 # Set working directory
 WORKDIR /app
 
-# Install build dependencies
-RUN apk add --no-cache python3 make g++
-
-# Copy package files
-COPY package*.json ./
-
-# Install all dependencies (including dev dependencies)
-RUN npm ci
-
-# Copy source code
-COPY . .
-
-# Build the application
-RUN npm run build
-
-# Production stage
-FROM node:18-alpine AS production
-
-# Set working directory
-WORKDIR /app
-
-# Install runtime dependencies
+# Install system dependencies
 RUN apk add --no-cache \
+    python3 \
+    make \
+    g++ \
     ffmpeg \
     curl
 
 # Copy package files
 COPY package*.json ./
 
-# Install only production dependencies
-RUN npm ci --only=production && npm cache clean --force
+# Install all dependencies
+RUN npm install
 
-# Copy built application from builder stage
-COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/client/dist ./client/dist
-
-# Copy other necessary files
-COPY server ./server
-COPY shared ./shared
+# Copy source code
+COPY . .
 
 # Create uploads directory for temporary file storage
 RUN mkdir -p uploads
