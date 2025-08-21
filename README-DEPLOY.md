@@ -11,7 +11,12 @@
 #### Configurações Básicas:
 - **Porta**: `5007`
 - **Build Context**: `/`
-- **Dockerfile**: `Dockerfile`
+- **Dockerfile**: `Dockerfile` (ou `Dockerfile.simple` se houver problemas de build)
+
+#### Solução para Problemas de Build:
+Se encontrar erro "vite: not found" durante o build:
+- Use `Dockerfile.simple` que evita problemas com dependências de desenvolvimento
+- Ou certifique-se de que todas as dependências estão sendo instaladas corretamente
 
 #### Variáveis de Ambiente Necessárias:
 ```
@@ -64,9 +69,25 @@ Após o deploy, acesse:
 - `https://seu-app.easypanel.io/` - Interface da aplicação
 
 ### 6. Logs e Troubleshooting:
+
+#### Problemas Comuns:
+1. **Erro "vite: not found"**:
+   - Solução: Use `Dockerfile.simple` em vez de `Dockerfile`
+   - Ou configure build-arg no EasyPanel para usar npm install em vez de npm ci --only=production
+
+2. **Erro de health check**:
+   - Verifique se a porta 5007 está configurada corretamente
+   - Confirme que `/api/health` está respondendo
+
+3. **Problemas com OpenAI API**:
+   - Verifique se `OPENAI_API_KEY` está configurada
+   - Teste a chave em uma requisição manual
+
+#### Debug:
 - Acesse os logs no painel do EasyPanel
 - Verifique se todas as variáveis de ambiente estão configuradas
 - Confirme se a chave da OpenAI está funcionando
+- Use `docker logs container-name` para debug local
 
 ## Recursos da Aplicação:
 - ✅ Transcrição de áudio em português
