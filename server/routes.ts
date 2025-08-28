@@ -14,6 +14,7 @@ const execAsync = promisify(exec);
 
 // Convert OPUS files to MP3 using FFmpeg
 async function convertOpusToMp3(inputPath: string): Promise<string> {
+  // Replace .opus extension with .mp3
   const outputPath = inputPath.replace(/\.opus$/i, '.mp3');
   
   try {
@@ -72,7 +73,15 @@ async function convertOpusToMp3(inputPath: string): Promise<string> {
 
 // Configure multer for file uploads
 const upload = multer({
-  dest: 'uploads/',
+  storage: multer.diskStorage({
+    destination: 'uploads/',
+    filename: (req, file, cb) => {
+      // Preserve file extension for easier processing
+      const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+      const ext = path.extname(file.originalname);
+      cb(null, file.fieldname + '-' + uniqueSuffix + ext);
+    }
+  }),
   limits: {
     fileSize: 10485760, // 10MB
   },
@@ -126,6 +135,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Check if file needs conversion
         let audioFilePath = file.path;
         let audioFileName = file.originalname;
+        
+        console.log(`Processing file: ${file.originalname}, path: ${file.path}, mimetype: ${file.mimetype}`);
         
         if (file.originalname.toLowerCase().endsWith('.opus')) {
           console.log('Converting OPUS file to MP3...');
