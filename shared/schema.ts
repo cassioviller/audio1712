@@ -28,7 +28,7 @@ export type Transcription = typeof transcriptions.$inferSelect;
 export const uploadAudioSchema = z.object({
   filename: z.string().min(1),
   size: z.number().max(10485760), // 10MB
-  mimeType: z.string().regex(/^(audio\/(mpeg|wav|x-m4a|mp4|m4a|mp3|aac)|application\/octet-stream)$/),
+  mimeType: z.string().regex(/^(audio\/(mpeg|wav|x-m4a|mp4|m4a|mp3|aac|opus)|application\/octet-stream)$/),
 });
 
 export const transcriptionResponseSchema = z.object({

@@ -110,3 +110,10 @@ The application follows a modern full-stack architecture with clear separation o
 - ✅ **FINAL FIX**: Upgraded to Node.js 20 Alpine for better compatibility
 - ✅ **FINAL FIX**: Enhanced entrypoint.sh with comprehensive error checking
 - ✅ **FINAL FIX**: Simplified server.listen() for Docker compatibility
+
+### Recent Changes (2025-08-29)
+- ✅ Added OPUS audio format support (.opus files)
+- ✅ Updated frontend validation to accept OPUS files
+- ✅ Updated backend file filter to accept OPUS format
+- ✅ Updated schema validation for OPUS MIME type
+- ✅ Updated UI descriptions to show OPUS support

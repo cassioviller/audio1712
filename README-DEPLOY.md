@@ -102,7 +102,7 @@ Após o deploy, acesse:
 
 ## Recursos da Aplicação:
 - ✅ Transcrição de áudio em português
-- ✅ Suporte a MP3, WAV, M4A
+- ✅ Suporte a MP3, WAV, M4A, OPUS
 - ✅ Interface drag-and-drop
 - ✅ Histórico de transcrições
 - ✅ Health check para monitoramento

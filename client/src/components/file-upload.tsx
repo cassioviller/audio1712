@@ -41,17 +41,18 @@ export function FileUpload({
       'audio/mp4',
       'audio/m4a',
       'audio/mp3',
-      'audio/aac'
+      'audio/aac',
+      'audio/opus'
     ];
     
     // Also check file extension as backup
-    const allowedExtensions = ['.mp3', '.wav', '.m4a', '.mp4', '.aac'];
+    const allowedExtensions = ['.mp3', '.wav', '.m4a', '.mp4', '.aac', '.opus'];
     const hasValidExtension = allowedExtensions.some(ext => 
       file.name.toLowerCase().endsWith(ext)
     );
     
     if (!allowedTypes.includes(file.type) && !hasValidExtension) {
-      onUploadError('Formato de arquivo não suportado. Use MP3, WAV ou M4A.');
+      onUploadError('Formato de arquivo não suportado. Use MP3, WAV, M4A ou OPUS.');
       return;
     }
 
@@ -118,7 +119,7 @@ export function FileUpload({
         <CardHeader>
           <h2 className="text-lg font-medium text-gray-900">Carregar Arquivo de Áudio</h2>
           <CardDescription>
-            Formatos suportados: MP3, WAV, M4A (máx. 10MB)
+            Formatos suportados: MP3, WAV, M4A, OPUS (máx. 10MB)
           </CardDescription>
         </CardHeader>
         

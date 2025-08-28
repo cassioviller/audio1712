@@ -16,14 +16,14 @@ const upload = multer({
   },
   fileFilter: (req, file, cb) => {
     // Check file extension - more reliable than MIME type for audio files
-    const allowedExtensions = ['.mp3', '.wav', '.m4a', '.mp4', '.aac'];
+    const allowedExtensions = ['.mp3', '.wav', '.m4a', '.mp4', '.aac', '.opus'];
     const filename = file.originalname.toLowerCase();
     const hasValidExtension = allowedExtensions.some(ext => filename.endsWith(ext));
     
     if (hasValidExtension) {
       cb(null, true);
     } else {
-      cb(new Error('Formato de arquivo não suportado. Use MP3, WAV ou M4A.'));
+      cb(new Error('Formato de arquivo não suportado. Use MP3, WAV, M4A ou OPUS.'));
     }
   },
 });
