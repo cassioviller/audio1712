@@ -92,8 +92,10 @@ async function getAudioDuration(filePath: string): Promise<number> {
 async function splitAudioIntoChunks(inputPath: string, chunkDurationSeconds: number): Promise<string[]> {
   const chunks: string[] = [];
   const baseName = path.basename(inputPath, path.extname(inputPath));
-  const extension = path.extname(inputPath);
   const outputDir = path.dirname(inputPath);
+  
+  // Always output as MP3 for consistent processing
+  const outputExtension = '.mp3';
   
   try {
     const totalDuration = await getAudioDuration(inputPath);
@@ -103,18 +105,26 @@ async function splitAudioIntoChunks(inputPath: string, chunkDurationSeconds: num
     
     for (let i = 0; i < numChunks; i++) {
       const startTime = i * chunkDurationSeconds;
-      const chunkPath = path.join(outputDir, `${baseName}_chunk_${i + 1}${extension}`);
+      const chunkPath = path.join(outputDir, `${baseName}_chunk_${i + 1}${outputExtension}`);
       
       const escapedInputPath = inputPath.replace(/'/g, "'\\''");
       const escapedChunkPath = chunkPath.replace(/'/g, "'\\''");
       
-      const command = `ffmpeg -y -i '${escapedInputPath}' -ss ${startTime} -t ${chunkDurationSeconds} -c copy '${escapedChunkPath}'`;
+      // Convert to MP3 during chunking to ensure compatibility
+      const command = `ffmpeg -y -i '${escapedInputPath}' -ss ${startTime} -t ${chunkDurationSeconds} -codec:a libmp3lame -b:a 128k '${escapedChunkPath}'`;
       
       console.log(`Creating chunk ${i + 1}/${numChunks}: ${command}`);
       await execAsync(command);
       
       if (fs.existsSync(chunkPath)) {
-        chunks.push(chunkPath);
+        const stats = fs.statSync(chunkPath);
+        if (stats.size > 0) {
+          chunks.push(chunkPath);
+          console.log(`Chunk ${i + 1} created successfully: ${chunkPath} (${stats.size} bytes)`);
+        } else {
+          console.log(`Chunk ${i + 1} is empty, skipping`);
+          fs.unlinkSync(chunkPath);
+        }
       }
     }
     
@@ -163,8 +173,9 @@ async function processAudioChunks(chunks: string[], originalFileName: string): P
       
     } catch (error) {
       console.error(`Error processing chunk ${i + 1}:`, error);
-      // Continue with other chunks even if one fails
-      combinedText += `[Erro ao processar segmento ${i + 1}] `;
+      // Continue with other chunks even if one fails, but provide more detailed error info
+      const errorMsg = error instanceof Error ? error.message : 'Erro desconhecido';
+      combinedText += `[Segmento ${i + 1}: ${errorMsg}] `;
     } finally {
       // Clean up chunk file
       if (fs.existsSync(chunkPath)) {
