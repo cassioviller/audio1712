@@ -16,14 +16,15 @@ const upload = multer({
   },
   fileFilter: (req, file, cb) => {
     // Check file extension - more reliable than MIME type for audio files
-    const allowedExtensions = ['.mp3', '.wav', '.m4a', '.mp4', '.aac', '.opus'];
+    // Based on OpenAI Whisper API supported formats: flac, m4a, mp3, mp4, mpeg, mpga, oga, ogg, wav, webm
+    const allowedExtensions = ['.mp3', '.wav', '.m4a', '.mp4', '.flac', '.ogg', '.webm', '.mpga', '.oga'];
     const filename = file.originalname.toLowerCase();
     const hasValidExtension = allowedExtensions.some(ext => filename.endsWith(ext));
     
     if (hasValidExtension) {
       cb(null, true);
     } else {
-      cb(new Error('Formato de arquivo não suportado. Use MP3, WAV, M4A ou OPUS.'));
+      cb(new Error('Formato de arquivo não suportado. Use MP3, WAV, M4A, MP4, FLAC, OGG ou WEBM.'));
     }
   },
 });
