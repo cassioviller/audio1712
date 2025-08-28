@@ -7,6 +7,35 @@ import { uploadAudioSchema, insertTranscriptionSchema } from "@shared/schema";
 import { transcribeAudio } from "./openai";
 import path from "path";
 import fs from "fs";
+import { exec } from "child_process";
+import { promisify } from "util";
+
+const execAsync = promisify(exec);
+
+// Convert OPUS files to MP3 using FFmpeg
+async function convertOpusToMp3(inputPath: string): Promise<string> {
+  const outputPath = inputPath.replace(/\.opus$/i, '.mp3');
+  
+  try {
+    // Use FFmpeg to convert OPUS to MP3
+    const command = `ffmpeg -i "${inputPath}" -codec:a libmp3lame -b:a 128k "${outputPath}"`;
+    await execAsync(command);
+    
+    // Remove original OPUS file
+    fs.unlinkSync(inputPath);
+    
+    return outputPath;
+  } catch (error) {
+    // Clean up files on error
+    if (fs.existsSync(outputPath)) {
+      fs.unlinkSync(outputPath);
+    }
+    if (fs.existsSync(inputPath)) {
+      fs.unlinkSync(inputPath);
+    }
+    throw new Error('Erro ao converter arquivo OPUS. Verifique se o arquivo não está corrompido.');
+  }
+}
 
 // Configure multer for file uploads
 const upload = multer({
@@ -16,15 +45,16 @@ const upload = multer({
   },
   fileFilter: (req, file, cb) => {
     // Check file extension - more reliable than MIME type for audio files
-    // Based on OpenAI Whisper API supported formats: flac, m4a, mp3, mp4, mpeg, mpga, oga, ogg, wav, webm
-    const allowedExtensions = ['.mp3', '.wav', '.m4a', '.mp4', '.flac', '.ogg', '.webm', '.mpga', '.oga'];
+    // OpenAI native formats: flac, m4a, mp3, mp4, mpeg, mpga, oga, ogg, wav, webm
+    // Additional formats that will be converted: opus
+    const allowedExtensions = ['.mp3', '.wav', '.m4a', '.mp4', '.flac', '.ogg', '.webm', '.mpga', '.oga', '.opus'];
     const filename = file.originalname.toLowerCase();
     const hasValidExtension = allowedExtensions.some(ext => filename.endsWith(ext));
     
     if (hasValidExtension) {
       cb(null, true);
     } else {
-      cb(new Error('Formato de arquivo não suportado. Use MP3, WAV, M4A, MP4, FLAC, OGG ou WEBM.'));
+      cb(new Error('Formato de arquivo não suportado. Use MP3, WAV, M4A, MP4, FLAC, OGG, WEBM ou OPUS.'));
     }
   },
 });
@@ -60,8 +90,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const startTime = Date.now();
 
       try {
+        // Check if file needs conversion
+        let audioFilePath = file.path;
+        let audioFileName = file.originalname;
+        
+        if (file.originalname.toLowerCase().endsWith('.opus')) {
+          console.log('Converting OPUS file to MP3...');
+          audioFilePath = await convertOpusToMp3(file.path);
+          audioFileName = file.originalname.replace(/\.opus$/i, '.mp3');
+        }
+
         // Transcribe audio using OpenAI Whisper
-        const transcriptionResult = await transcribeAudio(file.path, file.originalname);
+        const transcriptionResult = await transcribeAudio(audioFilePath, audioFileName);
         
         const processingTime = (Date.now() - startTime) / 1000; // Convert to seconds
         const wordCount = transcriptionResult.text.trim().split(/\s+/).length;
@@ -80,8 +120,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         const savedTranscription = await storage.createTranscription(transcriptionData);
 
-        // Clean up uploaded file
-        fs.unlinkSync(file.path);
+        // Clean up processed file (could be original or converted)
+        if (fs.existsSync(audioFilePath)) {
+          fs.unlinkSync(audioFilePath);
+        }
 
         res.json({
           id: savedTranscription.id,
@@ -95,8 +137,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
 
       } catch (transcriptionError) {
-        // Clean up uploaded file
-        fs.unlinkSync(file.path);
+        // Clean up any files that might exist (original or converted)
+        if (fs.existsSync(file.path)) {
+          fs.unlinkSync(file.path);
+        }
+        if (file.originalname.toLowerCase().endsWith('.opus')) {
+          const convertedPath = file.path.replace(/\.opus$/i, '.mp3');
+          if (fs.existsSync(convertedPath)) {
+            fs.unlinkSync(convertedPath);
+          }
+        }
         console.error("Transcription error:", transcriptionError);
         
         return res.status(500).json({ 

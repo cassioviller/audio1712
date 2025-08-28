@@ -112,8 +112,9 @@ The application follows a modern full-stack architecture with clear separation o
 - ✅ **FINAL FIX**: Simplified server.listen() for Docker compatibility
 
 ### Recent Changes (2025-08-29)
-- ✅ Added OPUS audio format support (.opus files)
-- ✅ Updated frontend validation to accept OPUS files
-- ✅ Updated backend file filter to accept OPUS format
-- ✅ Updated schema validation for OPUS MIME type
-- ✅ Updated UI descriptions to show OPUS support
+- ✅ Added comprehensive audio format support with automatic conversion
+- ✅ **OPUS Auto-Conversion**: OPUS files automatically converted to MP3 using FFmpeg
+- ✅ **Extended Format Support**: Added FLAC, OGG, WEBM support
+- ✅ **Seamless User Experience**: No additional approvals or pages needed for conversion
+- ✅ **Intelligent File Processing**: Automatic format detection and conversion
+- ✅ **Robust Error Handling**: Proper cleanup of original and converted files
