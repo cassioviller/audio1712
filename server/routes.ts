@@ -12,6 +12,10 @@ import { promisify } from "util";
 
 const execAsync = promisify(exec);
 
+// Configuration for audio chunking
+const MAX_CHUNK_SIZE_MB = 24; // OpenAI limit is 25MB, using 24MB for safety
+const CHUNK_DURATION_SECONDS = 600; // 10 minutes per chunk
+
 // Convert OPUS files to MP3 using FFmpeg
 async function convertOpusToMp3(inputPath: string): Promise<string> {
   // Replace .opus extension with .mp3
@@ -71,6 +75,111 @@ async function convertOpusToMp3(inputPath: string): Promise<string> {
   }
 }
 
+// Get audio duration in seconds using FFprobe
+async function getAudioDuration(filePath: string): Promise<number> {
+  try {
+    const escapedPath = filePath.replace(/'/g, "'\\''");
+    const command = `ffprobe -v quiet -show_entries format=duration -of csv=p=0 '${escapedPath}'`;
+    const { stdout } = await execAsync(command);
+    return parseFloat(stdout.trim());
+  } catch (error) {
+    console.error('Error getting audio duration:', error);
+    throw new Error('Falha ao obter duração do áudio');
+  }
+}
+
+// Split audio file into chunks
+async function splitAudioIntoChunks(inputPath: string, chunkDurationSeconds: number): Promise<string[]> {
+  const chunks: string[] = [];
+  const baseName = path.basename(inputPath, path.extname(inputPath));
+  const extension = path.extname(inputPath);
+  const outputDir = path.dirname(inputPath);
+  
+  try {
+    const totalDuration = await getAudioDuration(inputPath);
+    const numChunks = Math.ceil(totalDuration / chunkDurationSeconds);
+    
+    console.log(`Splitting audio into ${numChunks} chunks of ${chunkDurationSeconds}s each`);
+    
+    for (let i = 0; i < numChunks; i++) {
+      const startTime = i * chunkDurationSeconds;
+      const chunkPath = path.join(outputDir, `${baseName}_chunk_${i + 1}${extension}`);
+      
+      const escapedInputPath = inputPath.replace(/'/g, "'\\''");
+      const escapedChunkPath = chunkPath.replace(/'/g, "'\\''");
+      
+      const command = `ffmpeg -y -i '${escapedInputPath}' -ss ${startTime} -t ${chunkDurationSeconds} -c copy '${escapedChunkPath}'`;
+      
+      console.log(`Creating chunk ${i + 1}/${numChunks}: ${command}`);
+      await execAsync(command);
+      
+      if (fs.existsSync(chunkPath)) {
+        chunks.push(chunkPath);
+      }
+    }
+    
+    return chunks;
+  } catch (error) {
+    // Clean up any created chunks on error
+    chunks.forEach(chunkPath => {
+      if (fs.existsSync(chunkPath)) {
+        fs.unlinkSync(chunkPath);
+      }
+    });
+    
+    console.error('Error splitting audio:', error);
+    throw new Error('Falha ao dividir arquivo de áudio');
+  }
+}
+
+// Process audio chunks sequentially and combine transcriptions
+async function processAudioChunks(chunks: string[], originalFileName: string): Promise<{
+  text: string;
+  duration: number;
+  totalChunks: number;
+}> {
+  let combinedText = '';
+  let totalDuration = 0;
+  
+  console.log(`Processing ${chunks.length} audio chunks sequentially`);
+  
+  for (let i = 0; i < chunks.length; i++) {
+    const chunkPath = chunks[i];
+    const chunkFileName = `${originalFileName}_chunk_${i + 1}`;
+    
+    console.log(`Processing chunk ${i + 1}/${chunks.length}: ${chunkPath}`);
+    
+    try {
+      const result = await transcribeAudio(chunkPath, chunkFileName);
+      
+      // Add chunk text with separator if not the first chunk
+      if (combinedText && result.text.trim()) {
+        combinedText += ' ';
+      }
+      combinedText += result.text.trim();
+      totalDuration += result.duration || 0;
+      
+      console.log(`Chunk ${i + 1} completed. Text length: ${result.text.length} chars`);
+      
+    } catch (error) {
+      console.error(`Error processing chunk ${i + 1}:`, error);
+      // Continue with other chunks even if one fails
+      combinedText += `[Erro ao processar segmento ${i + 1}] `;
+    } finally {
+      // Clean up chunk file
+      if (fs.existsSync(chunkPath)) {
+        fs.unlinkSync(chunkPath);
+      }
+    }
+  }
+  
+  return {
+    text: combinedText,
+    duration: totalDuration,
+    totalChunks: chunks.length
+  };
+}
+
 // Configure multer for file uploads
 const upload = multer({
   storage: multer.diskStorage({
@@ -83,7 +192,7 @@ const upload = multer({
     }
   }),
   limits: {
-    fileSize: 10485760, // 10MB
+    fileSize: 104857600, // 100MB - large files handled by chunking
   },
   fileFilter: (req, file, cb) => {
     // Check file extension - more reliable than MIME type for audio files
@@ -136,7 +245,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         let audioFilePath = file.path;
         let audioFileName = file.originalname;
         
-        console.log(`Processing file: ${file.originalname}, path: ${file.path}, mimetype: ${file.mimetype}`);
+        console.log(`Processing file: ${file.originalname}, path: ${file.path}, size: ${file.size} bytes, mimetype: ${file.mimetype}`);
         
         if (file.originalname.toLowerCase().endsWith('.opus')) {
           console.log('Converting OPUS file to MP3...');
@@ -144,18 +253,53 @@ export async function registerRoutes(app: Express): Promise<Server> {
           audioFileName = file.originalname.replace(/\.opus$/i, '.mp3');
         }
 
-        // Transcribe audio using OpenAI Whisper
-        const transcriptionResult = await transcribeAudio(audioFilePath, audioFileName);
+        // Check if file is too large or too long and needs chunking
+        const fileSizeMB = file.size / (1024 * 1024);
+        const shouldSplitBySize = fileSizeMB > MAX_CHUNK_SIZE_MB;
+        
+        let shouldSplitByDuration = false;
+        let audioDuration = 0;
+        
+        try {
+          audioDuration = await getAudioDuration(audioFilePath);
+          shouldSplitByDuration = audioDuration > CHUNK_DURATION_SECONDS;
+          console.log(`Audio duration: ${audioDuration}s, size: ${fileSizeMB.toFixed(2)}MB`);
+        } catch (error) {
+          console.log('Could not determine audio duration, proceeding without duration-based splitting');
+        }
+
+        let transcriptionResult;
+        let totalChunks = 1;
+
+        if (shouldSplitBySize || shouldSplitByDuration) {
+          console.log(`Large file detected. Splitting into chunks...`);
+          
+          // Split audio into chunks and process sequentially
+          const chunks = await splitAudioIntoChunks(audioFilePath, CHUNK_DURATION_SECONDS);
+          const chunkResult = await processAudioChunks(chunks, file.originalname);
+          
+          transcriptionResult = {
+            text: chunkResult.text,
+            duration: chunkResult.duration
+          };
+          totalChunks = chunkResult.totalChunks;
+          
+          console.log(`Completed processing ${totalChunks} chunks. Total duration: ${chunkResult.duration}s`);
+        } else {
+          // Process single file normally
+          console.log('Processing single file...');
+          transcriptionResult = await transcribeAudio(audioFilePath, audioFileName);
+        }
         
         const processingTime = (Date.now() - startTime) / 1000; // Convert to seconds
-        const wordCount = transcriptionResult.text.trim().split(/\s+/).length;
+        const wordCount = transcriptionResult.text.trim().split(/\s+/).filter(word => word.length > 0).length;
 
         // Save transcription to storage
         const transcriptionData = {
           filename: file.originalname,
           originalSize: file.size,
           mimeType: file.mimetype,
-          duration: transcriptionResult.duration,
+          duration: transcriptionResult.duration || 0,
           transcriptionText: transcriptionResult.text,
           wordCount,
           confidence: 0.94, // Whisper doesn't provide confidence, using estimated value
@@ -177,6 +321,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           wordCount: savedTranscription.wordCount,
           confidence: savedTranscription.confidence,
           processingTime: savedTranscription.processingTime,
+          totalChunks: totalChunks,
           createdAt: savedTranscription.createdAt.toISOString(),
         });
 

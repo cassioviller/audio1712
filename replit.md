@@ -118,3 +118,6 @@ The application follows a modern full-stack architecture with clear separation o
 - ✅ **Seamless User Experience**: No additional approvals or pages needed for conversion
 - ✅ **Intelligent File Processing**: Automatic format detection and conversion
 - ✅ **Robust Error Handling**: Proper cleanup of original and converted files
+- ✅ **Large File Support**: Automatic chunking for files >24MB or >10 minutes
+- ✅ **Sequential Processing**: Queue-based processing of audio chunks with text concatenation
+- ✅ **UI Improvements**: Shows chunk count for large files, increased file size limit to 100MB

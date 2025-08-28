@@ -27,7 +27,7 @@ export type Transcription = typeof transcriptions.$inferSelect;
 // Request/Response schemas
 export const uploadAudioSchema = z.object({
   filename: z.string().min(1),
-  size: z.number().max(10485760), // 10MB
+  size: z.number().max(104857600), // 100MB - chunking handles large files
   mimeType: z.string().regex(/^(audio\/(mpeg|wav|x-m4a|mp4|m4a|mp3|aac|opus|flac|ogg|webm)|application\/octet-stream)$/),
 });
 
@@ -39,6 +39,7 @@ export const transcriptionResponseSchema = z.object({
   wordCount: z.number(),
   confidence: z.number().optional(),
   processingTime: z.number(),
+  totalChunks: z.number().optional(),
   createdAt: z.string(),
 });
 

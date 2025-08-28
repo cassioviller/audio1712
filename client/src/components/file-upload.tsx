@@ -59,9 +59,9 @@ export function FileUpload({
       return;
     }
 
-    // Validate file size (10MB)
-    if (file.size > 10485760) {
-      onUploadError('Arquivo muito grande. O tamanho máximo é 10MB.');
+    // Validate file size (100MB - large files are handled by chunking)
+    if (file.size > 104857600) {
+      onUploadError('Arquivo muito grande. O tamanho máximo é 100MB.');
       return;
     }
 
@@ -122,7 +122,10 @@ export function FileUpload({
         <CardHeader>
           <h2 className="text-lg font-medium text-gray-900">Carregar Arquivo de Áudio</h2>
           <CardDescription>
-            Formatos suportados: MP3, WAV, M4A, FLAC, OGG, WEBM, OPUS (máx. 10MB)
+            Formatos suportados: MP3, WAV, M4A, FLAC, OGG, WEBM, OPUS<br/>
+            <span className="text-sm text-gray-500">
+              Arquivos grandes são automaticamente divididos e processados em segmentos
+            </span>
           </CardDescription>
         </CardHeader>
         

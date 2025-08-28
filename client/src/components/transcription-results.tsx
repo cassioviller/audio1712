@@ -173,19 +173,35 @@ export function TranscriptionResults({ transcription, onNewTranscription }: Tran
           </div>
         </Card>
         
-        <Card className="p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-secondary">Confiança</p>
-              <p className="text-lg font-semibold text-gray-900" data-testid="stat-confidence">
-                {transcription.confidence ? `${Math.round(transcription.confidence * 100)}%` : "N/A"}
-              </p>
+{transcription.totalChunks && transcription.totalChunks > 1 ? (
+          <Card className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-secondary">Segmentos</p>
+                <p className="text-lg font-semibold text-gray-900" data-testid="stat-chunks">
+                  {transcription.totalChunks}
+                </p>
+              </div>
+              <svg className="w-5 h-5 text-primary" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M19,3H5C3.9,3 3,3.9 3,5V19C3,20.1 3.9,21 5,21H19C20.1,21 21,20.1 21,19V5C21,3.9 20.1,3 19,3M19,19H5V5H19V19M17,17V15H7V17H17M17,13V11H7V13H17M17,9V7H7V9H17Z"/>
+              </svg>
             </div>
-            <svg className="w-5 h-5 text-primary" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M16,6L18.29,8.29L13.41,13.17L9.41,9.17L2,16.59L3.41,18L9.41,12L13.41,16L19.71,9.71L22,12V6H16Z"/>
-            </svg>
-          </div>
-        </Card>
+          </Card>
+        ) : (
+          <Card className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-secondary">Confiança</p>
+                <p className="text-lg font-semibold text-gray-900" data-testid="stat-confidence">
+                  {transcription.confidence ? `${Math.round(transcription.confidence * 100)}%` : "N/A"}
+                </p>
+              </div>
+              <svg className="w-5 h-5 text-primary" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M16,6L18.29,8.29L13.41,13.17L9.41,9.17L2,16.59L3.41,18L9.41,12L13.41,16L19.71,9.71L22,12V6H16Z"/>
+              </svg>
+            </div>
+          </Card>
+        )}
       </div>
     </div>
   );
