@@ -17,15 +17,46 @@ async function convertOpusToMp3(inputPath: string): Promise<string> {
   const outputPath = inputPath.replace(/\.opus$/i, '.mp3');
   
   try {
-    // Use FFmpeg to convert OPUS to MP3
-    const command = `ffmpeg -i "${inputPath}" -codec:a libmp3lame -b:a 128k "${outputPath}"`;
-    await execAsync(command);
+    console.log(`Converting OPUS file: ${inputPath} -> ${outputPath}`);
     
-    // Remove original OPUS file
+    // Check if input file exists
+    if (!fs.existsSync(inputPath)) {
+      throw new Error(`Input file does not exist: ${inputPath}`);
+    }
+    
+    // Use FFmpeg to convert OPUS to MP3 with error handling
+    // Escape file paths properly to handle special characters
+    const escapedInputPath = inputPath.replace(/'/g, "'\\''");
+    const escapedOutputPath = outputPath.replace(/'/g, "'\\''");
+    const command = `ffmpeg -y -i '${escapedInputPath}' -codec:a libmp3lame -b:a 128k '${escapedOutputPath}'`;
+    console.log(`Running FFmpeg command: ${command}`);
+    
+    const { stdout, stderr } = await execAsync(command);
+    console.log('FFmpeg stdout:', stdout);
+    if (stderr) {
+      console.log('FFmpeg stderr:', stderr);
+    }
+    
+    // Check if output file was created
+    if (!fs.existsSync(outputPath)) {
+      throw new Error('Conversion failed: output file was not created');
+    }
+    
+    // Check output file size
+    const outputStats = fs.statSync(outputPath);
+    if (outputStats.size === 0) {
+      throw new Error('Conversion failed: output file is empty');
+    }
+    
+    console.log(`Conversion successful. Output file size: ${outputStats.size} bytes`);
+    
+    // Remove original OPUS file only if conversion was successful
     fs.unlinkSync(inputPath);
     
     return outputPath;
   } catch (error) {
+    console.error('FFmpeg conversion error:', error);
+    
     // Clean up files on error
     if (fs.existsSync(outputPath)) {
       fs.unlinkSync(outputPath);
@@ -33,7 +64,9 @@ async function convertOpusToMp3(inputPath: string): Promise<string> {
     if (fs.existsSync(inputPath)) {
       fs.unlinkSync(inputPath);
     }
-    throw new Error('Erro ao converter arquivo OPUS. Verifique se o arquivo não está corrompido.');
+    
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    throw new Error(`Erro ao converter arquivo OPUS: ${errorMessage}`);
   }
 }
 
