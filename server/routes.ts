@@ -271,6 +271,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           audioFilePath = await convertOpusToMp3(file.path);
           audioFileName = file.originalname.replace(/\.opus$/i, '.mp3');
         }
+        
+        // Verify file exists and is readable
+        if (!fs.existsSync(audioFilePath)) {
+          throw new Error(`Processed audio file not found: ${audioFilePath}`);
+        }
 
         // Check if file is too large or too long and needs chunking
         const fileSizeMB = file.size / (1024 * 1024);

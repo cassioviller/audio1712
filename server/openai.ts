@@ -24,16 +24,8 @@ export async function transcribeAudio(audioFilePath: string, originalFilename?: 
       throw new Error("Arquivo de áudio não encontrado.");
     }
 
-    // If we have an original filename, create a temporary file with the correct extension
+    // For MP3 files, use directly; for chunks, they should already be MP3
     let fileToTranscribe = audioFilePath;
-    if (originalFilename) {
-      const path = await import('path');
-      const extension = path.extname(originalFilename);
-      if (extension) {
-        fileToTranscribe = audioFilePath + extension;
-        fs.copyFileSync(audioFilePath, fileToTranscribe);
-      }
-    }
 
     // Create read stream for the audio file
     const audioReadStream = fs.createReadStream(fileToTranscribe);
@@ -46,10 +38,7 @@ export async function transcribeAudio(audioFilePath: string, originalFilename?: 
       language: "pt", // Portuguese language hint for better accuracy
     });
 
-    // Clean up temporary file if we created one
-    if (fileToTranscribe !== audioFilePath && fs.existsSync(fileToTranscribe)) {
-      fs.unlinkSync(fileToTranscribe);
-    }
+    // No cleanup needed since we're using the file directly
 
     // Validate transcription result
     if (!transcription.text || transcription.text.trim().length === 0) {
