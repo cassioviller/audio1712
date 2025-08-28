@@ -91,11 +91,8 @@ async function getAudioDuration(filePath: string): Promise<number> {
 // Split audio file into chunks
 async function splitAudioIntoChunks(inputPath: string, chunkDurationSeconds: number): Promise<string[]> {
   const chunks: string[] = [];
-  const baseName = path.basename(inputPath, path.extname(inputPath));
+  const timestamp = Date.now();
   const outputDir = path.dirname(inputPath);
-  
-  // Always output as MP3 for consistent processing
-  const outputExtension = '.mp3';
   
   try {
     const totalDuration = await getAudioDuration(inputPath);
@@ -105,7 +102,8 @@ async function splitAudioIntoChunks(inputPath: string, chunkDurationSeconds: num
     
     for (let i = 0; i < numChunks; i++) {
       const startTime = i * chunkDurationSeconds;
-      const chunkPath = path.join(outputDir, `${baseName}_chunk_${i + 1}${outputExtension}`);
+      // Generate clean chunk filename with timestamp to avoid conflicts
+      const chunkPath = path.join(outputDir, `chunk_${timestamp}_${i + 1}.mp3`);
       
       const escapedInputPath = inputPath.replace(/'/g, "'\\''");
       const escapedChunkPath = chunkPath.replace(/'/g, "'\\''");
@@ -113,19 +111,29 @@ async function splitAudioIntoChunks(inputPath: string, chunkDurationSeconds: num
       // Convert to MP3 during chunking to ensure compatibility
       const command = `ffmpeg -y -i '${escapedInputPath}' -ss ${startTime} -t ${chunkDurationSeconds} -codec:a libmp3lame -b:a 128k '${escapedChunkPath}'`;
       
-      console.log(`Creating chunk ${i + 1}/${numChunks}: ${command}`);
-      await execAsync(command);
+      console.log(`Creating chunk ${i + 1}/${numChunks}: ${chunkPath}`);
+      const { stdout, stderr } = await execAsync(command);
+      
+      if (stderr && !stderr.includes('size=')) {
+        console.log(`FFmpeg stderr for chunk ${i + 1}:`, stderr);
+      }
       
       if (fs.existsSync(chunkPath)) {
         const stats = fs.statSync(chunkPath);
-        if (stats.size > 0) {
+        if (stats.size > 1000) { // Minimum 1KB for valid audio
           chunks.push(chunkPath);
           console.log(`Chunk ${i + 1} created successfully: ${chunkPath} (${stats.size} bytes)`);
         } else {
-          console.log(`Chunk ${i + 1} is empty, skipping`);
+          console.log(`Chunk ${i + 1} is too small (${stats.size} bytes), skipping`);
           fs.unlinkSync(chunkPath);
         }
+      } else {
+        console.log(`Warning: Chunk ${i + 1} was not created: ${chunkPath}`);
       }
+    }
+    
+    if (chunks.length === 0) {
+      throw new Error('No valid chunks were created');
     }
     
     return chunks;
