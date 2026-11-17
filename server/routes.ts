@@ -448,7 +448,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Video -> study package (frames + mosaic + cover + audio + transcription) as a zip download.
   // Form fields: videoFile (file), fps (default 8), format ("webp" | "jpg"), transcribe ("0" to skip),
   // name (folder/zip name), and optional texts: legenda, comentarios, leiaMe.
-  app.post("/api/package", upload.single('videoFile'), async (req, res) => {
+  // multer errors (size, extension) come back as JSON so the page can show them
+  const uploadVideo = (req: any, res: any, next: any) =>
+    upload.single('videoFile')(req, res, (err: any) => {
+      if (!err) return next();
+      const msg = err instanceof multer.MulterError && err.code === 'LIMIT_FILE_SIZE'
+        ? "Vídeo muito grande. O tamanho máximo é 100MB."
+        : err.message || "Erro no envio do vídeo.";
+      res.status(400).json({ error: msg });
+    });
+
+  app.post("/api/package", uploadVideo, async (req, res) => {
     if (!req.file) {
       return res.status(400).json({ error: "Envie o vídeo no campo videoFile." });
     }
