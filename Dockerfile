@@ -10,6 +10,8 @@ RUN apk add --no-cache \
     make \
     g++ \
     ffmpeg \
+    zip \
+    font-dejavu \
     curl
 
 # Copy package files
