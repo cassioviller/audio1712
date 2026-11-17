@@ -75,13 +75,13 @@ export async function buildVideoPackage(videoPath: string, workDir: string, opts
     .find((f) => fs.existsSync(f));
   const fontOpt = font ? `fontfile=${font}:` : "";
   await execAsync(
-    `ffmpeg -y -loglevel error -i ${q(videoPath)} -vf "fps=1,scale=135:-2,pad=iw:ih+18:0:0:black,` +
+    `ffmpeg -y -loglevel error -i ${q(videoPath)} -vf "fps=1,scale=136:-2,pad=iw:ih+18:0:0:black,` +
       `drawtext=${fontOpt}text='%{eif\\:t\\:d}s':x=4:y=h-15:fontsize=13:fontcolor=yellow,tile=${cols}x${tileRows}" ` +
       `-frames:v 1 -q:v 3 ${q(path.join(root, "mosaico_1_por_segundo.jpg"))}`,
   ).catch(async () => {
     // drawtext needs a font; without it, make the mosaic without the labels
     await execAsync(
-      `ffmpeg -y -loglevel error -i ${q(videoPath)} -vf "fps=1,scale=135:-2,tile=${cols}x${tileRows}" -frames:v 1 -q:v 3 ${q(path.join(root, "mosaico_1_por_segundo.jpg"))}`,
+      `ffmpeg -y -loglevel error -i ${q(videoPath)} -vf "fps=1,scale=136:-2,tile=${cols}x${tileRows}" -frames:v 1 -q:v 3 ${q(path.join(root, "mosaico_1_por_segundo.jpg"))}`,
     );
   });
 
