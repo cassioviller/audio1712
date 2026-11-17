@@ -3,6 +3,7 @@ import { FileUpload } from "@/components/file-upload";
 import { ProcessingStatus } from "@/components/processing-status";
 import { TranscriptionResults } from "@/components/transcription-results";
 import { ErrorDisplay } from "@/components/error-display";
+import { AppHeader } from "@/components/app-header";
 import type { TranscriptionResponse } from "@shared/schema";
 
 type AppState = 'upload' | 'processing' | 'results' | 'error';
@@ -39,32 +40,9 @@ export default function Home() {
 
   return (
     <div className="font-sans bg-gray-50 min-h-screen">
-      {/* Header */}
-      <header className="bg-white shadow-sm border-b border-gray-200">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center">
-                <svg className="w-5 h-5 text-white" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3zM9 12a3 3 0 1 1 6 0v4a3 3 0 1 1-6 0v-4zm10.5 0A1.5 1.5 0 0 1 21 10.5V12a9 9 0 1 1-18 0v-1.5A1.5 1.5 0 0 1 4.5 9 1.5 1.5 0 0 1 6 10.5V12a6 6 0 1 0 12 0v-1.5A1.5 1.5 0 0 1 19.5 9a1.5 1.5 0 0 1 1.5 1.5z"/>
-                </svg>
-              </div>
-              <div>
-                <h1 className="text-xl font-semibold text-gray-900">AudioScript</h1>
-                <p className="text-sm text-secondary">Transcrição rápida de áudio</p>
-              </div>
-            </div>
-            <div className="flex items-center space-x-2 text-sm text-secondary">
-              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z"/>
-              </svg>
-              <span>Seguro & Privado</span>
-            </div>
-          </div>
-        </div>
-      </header>
+      <AppHeader />
 
-      <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <main className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {state === 'upload' && (
           <FileUpload
             onUploadStart={handleUploadStart}
