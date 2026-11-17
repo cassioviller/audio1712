@@ -6,6 +6,8 @@ import { storage } from "./storage";
 import { uploadAudioSchema, insertTranscriptionSchema } from "@shared/schema";
 import { transcribeAudio, type TranscriptionSegment } from "./openai";
 import { isVideoFile, extractAudioFromVideo, checkSpeech, segmentsToSrt } from "./speech";
+import { buildVideoPackage } from "./package";
+import os from "os";
 import path from "path";
 import fs from "fs";
 import { exec } from "child_process";
@@ -440,6 +442,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Get transcription error:", error);
       res.status(500).json({ error: "Erro ao buscar transcrição." });
+    }
+  });
+
+  // Video -> study package (frames + mosaic + cover + audio + transcription) as a zip download.
+  // Form fields: videoFile (file), fps (default 8), format ("webp" | "jpg"), transcribe ("0" to skip),
+  // name (folder/zip name), and optional texts: legenda, comentarios, leiaMe.
+  app.post("/api/package", upload.single('videoFile'), async (req, res) => {
+    if (!req.file) {
+      return res.status(400).json({ error: "Envie o vídeo no campo videoFile." });
+    }
+    const workDir = fs.mkdtempSync(path.join(os.tmpdir(), "pacote-"));
+    const cleanup = () => {
+      fs.rmSync(workDir, { recursive: true, force: true });
+      if (req.file && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
+    };
+    try {
+      const body = req.body || {};
+      const fps = Math.min(30, Math.max(1, parseFloat(body.fps) || 8));
+      const format = body.format === "jpg" ? "jpg" : "webp";
+      const safeName = String(body.name || path.parse(req.file.originalname).name)
+        .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+        .replace(/[^A-Za-z0-9._ -]/g, "_").slice(0, 120) || "video";
+      const zipPath = await buildVideoPackage(req.file.path, workDir, {
+        fps, format,
+        transcribe: body.transcribe !== "0",
+        name: safeName,
+        legenda: body.legenda, comentarios: body.comentarios, leiaMe: body.leiaMe,
+      });
+      res.download(zipPath, `${safeName}.zip`, () => cleanup());
+    } catch (error) {
+      console.error("Package error:", error);
+      cleanup();
+      res.status(500).json({ error: (error as Error).message || "Erro ao gerar o pacote." });
     }
   });
 
