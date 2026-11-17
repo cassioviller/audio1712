@@ -4,7 +4,8 @@ import multer from "multer";
 import { z } from "zod";
 import { storage } from "./storage";
 import { uploadAudioSchema, insertTranscriptionSchema } from "@shared/schema";
-import { transcribeAudio } from "./openai";
+import { transcribeAudio, type TranscriptionSegment } from "./openai";
+import { isVideoFile, extractAudioFromVideo, checkSpeech, segmentsToSrt } from "./speech";
 import path from "path";
 import fs from "fs";
 import { exec } from "child_process";
@@ -151,13 +152,15 @@ async function splitAudioIntoChunks(inputPath: string, chunkDurationSeconds: num
 }
 
 // Process audio chunks sequentially and combine transcriptions
-async function processAudioChunks(chunks: string[], originalFileName: string): Promise<{
+async function processAudioChunks(chunks: string[], originalFileName: string, chunkDurationSeconds: number): Promise<{
   text: string;
   duration: number;
   totalChunks: number;
+  segments: TranscriptionSegment[];
 }> {
   let combinedText = '';
   let totalDuration = 0;
+  const allSegments: TranscriptionSegment[] = [];
   
   console.log(`Processing ${chunks.length} audio chunks sequentially`);
   
@@ -176,6 +179,11 @@ async function processAudioChunks(chunks: string[], originalFileName: string): P
       }
       combinedText += result.text.trim();
       totalDuration += result.duration || 0;
+      // Chunk timestamps start at 0: shift them so they match the original file
+      const offset = i * chunkDurationSeconds;
+      for (const seg of result.segments) {
+        allSegments.push({ ...seg, start: seg.start + offset, end: seg.end + offset });
+      }
       
       console.log(`Chunk ${i + 1} completed. Text length: ${result.text.length} chars`);
       
@@ -195,7 +203,8 @@ async function processAudioChunks(chunks: string[], originalFileName: string): P
   return {
     text: combinedText,
     duration: totalDuration,
-    totalChunks: chunks.length
+    totalChunks: chunks.length,
+    segments: allSegments,
   };
 }
 
@@ -217,17 +226,20 @@ const upload = multer({
     // Check file extension - more reliable than MIME type for audio files
     // OpenAI native formats: flac, m4a, mp3, mp4, mpeg, mpga, oga, ogg, wav, webm
     // Additional formats that will be converted: opus
-    const allowedExtensions = ['.mp3', '.wav', '.m4a', '.mp4', '.flac', '.ogg', '.webm', '.mpga', '.oga', '.opus'];
+    const allowedExtensions = ['.mp3', '.wav', '.m4a', '.mp4', '.mov', '.mkv', '.flac', '.ogg', '.webm', '.mpga', '.oga', '.opus'];
     const filename = file.originalname.toLowerCase();
     const hasValidExtension = allowedExtensions.some(ext => filename.endsWith(ext));
     
     if (hasValidExtension) {
       cb(null, true);
     } else {
-      cb(new Error('Formato de arquivo não suportado. Use MP3, WAV, M4A, MP4, FLAC, OGG, WEBM ou OPUS.'));
+      cb(new Error('Formato de arquivo não suportado. Use MP3, WAV, M4A, MP4, MOV, FLAC, OGG, WEBM ou OPUS.'));
     }
   },
 });
+
+// Segments are kept next to the stored transcription (MemStorage has no column for them)
+const segmentsById = new Map<string, TranscriptionSegment[]>();
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Upload and transcribe audio file
@@ -270,6 +282,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           console.log('Converting OPUS file to MP3...');
           audioFilePath = await convertOpusToMp3(file.path);
           audioFileName = file.originalname.replace(/\.opus$/i, '.mp3');
+        } else if (isVideoFile(file.originalname)) {
+          // Reels/TikToks: keep only the audio track, much smaller than the video
+          console.log('Extracting audio from video...');
+          audioFilePath = await extractAudioFromVideo(file.path);
+          audioFileName = file.originalname.replace(/\.[^.]+$/, '.mp3');
         }
         
         // Verify file exists and is readable
@@ -278,7 +295,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
 
         // Check if file is too large or too long and needs chunking
-        const fileSizeMB = file.size / (1024 * 1024);
+        const fileSizeMB = fs.statSync(audioFilePath).size / (1024 * 1024);
         const shouldSplitBySize = fileSizeMB > MAX_CHUNK_SIZE_MB;
         
         let shouldSplitByDuration = false;
@@ -300,11 +317,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           
           // Split audio into chunks and process sequentially
           const chunks = await splitAudioIntoChunks(audioFilePath, CHUNK_DURATION_SECONDS);
-          const chunkResult = await processAudioChunks(chunks, file.originalname);
+          const chunkResult = await processAudioChunks(chunks, file.originalname, CHUNK_DURATION_SECONDS);
           
           transcriptionResult = {
             text: chunkResult.text,
-            duration: chunkResult.duration
+            duration: chunkResult.duration,
+            segments: chunkResult.segments,
           };
           totalChunks = chunkResult.totalChunks;
           
@@ -316,6 +334,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
         
         const processingTime = (Date.now() - startTime) / 1000; // Convert to seconds
+        const speech = checkSpeech(transcriptionResult.text, transcriptionResult.segments);
+        const finalDuration = transcriptionResult.duration || audioDuration || 0;
         const wordCount = transcriptionResult.text.trim().split(/\s+/).filter(word => word.length > 0).length;
 
         // Save transcription to storage
@@ -323,7 +343,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           filename: file.originalname,
           originalSize: file.size,
           mimeType: file.mimetype,
-          duration: transcriptionResult.duration || 0,
+          duration: finalDuration,
           transcriptionText: transcriptionResult.text,
           wordCount,
           confidence: 0.94, // Whisper doesn't provide confidence, using estimated value
@@ -331,6 +351,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         };
 
         const savedTranscription = await storage.createTranscription(transcriptionData);
+        segmentsById.set(savedTranscription.id, transcriptionResult.segments);
 
         // Clean up processed file (could be original or converted)
         if (fs.existsSync(audioFilePath)) {
@@ -347,6 +368,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           processingTime: savedTranscription.processingTime,
           totalChunks: totalChunks,
           createdAt: savedTranscription.createdAt.toISOString(),
+          // New fields (additive: old clients keep working)
+          hasSpeech: speech.hasSpeech,
+          speechNote: speech.note,
+          segments: transcriptionResult.segments,
+          srt: segmentsToSrt(transcriptionResult.segments),
         });
 
       } catch (transcriptionError) {
@@ -354,10 +380,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (fs.existsSync(file.path)) {
           fs.unlinkSync(file.path);
         }
-        if (file.originalname.toLowerCase().endsWith('.opus')) {
-          const convertedPath = file.path.replace(/\.opus$/i, '.mp3');
-          if (fs.existsSync(convertedPath)) {
-            fs.unlinkSync(convertedPath);
+        for (const leftover of [file.path.replace(/\.opus$/i, '.mp3'), file.path.replace(/\.[^.]+$/, '') + '.audio.mp3']) {
+          if (leftover !== file.path && fs.existsSync(leftover)) {
+            fs.unlinkSync(leftover);
           }
         }
         console.error("Transcription error:", transcriptionError);
@@ -378,7 +403,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (error instanceof multer.MulterError) {
         if (error.code === 'LIMIT_FILE_SIZE') {
           return res.status(400).json({ 
-            error: "Arquivo muito grande. O tamanho máximo é 10MB." 
+            error: "Arquivo muito grande. O tamanho máximo é 100MB." 
           });
         }
         return res.status(400).json({ 
@@ -409,6 +434,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         confidence: transcription.confidence,
         processingTime: transcription.processingTime,
         createdAt: transcription.createdAt.toISOString(),
+        segments: segmentsById.get(transcription.id) || [],
+        srt: segmentsToSrt(segmentsById.get(transcription.id) || []),
       });
     } catch (error) {
       console.error("Get transcription error:", error);

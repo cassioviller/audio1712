@@ -6,6 +6,35 @@ const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
+// CORS for the API: lets a script running on Instagram/TikTok/YouTube pages send audio
+// directly with fetch() and read the JSON back, without leaving the page.
+// ALLOWED_ORIGINS: comma-separated list; defaults to the three platforms.
+// API_TOKEN (optional): if set, cross-origin requests must send it in the "x-api-token" header.
+const allowedOrigins = (process.env.ALLOWED_ORIGINS ||
+  "https://www.instagram.com,https://www.tiktok.com,https://www.youtube.com")
+  .split(",")
+  .map((o) => o.trim())
+  .filter(Boolean);
+
+app.use("/api", (req, res, next) => {
+  const origin = req.headers.origin;
+  if (!origin || !allowedOrigins.includes(origin)) {
+    return next(); // same-origin (the site itself) or not allowed: normal behaviour
+  }
+  res.setHeader("Access-Control-Allow-Origin", origin);
+  res.setHeader("Vary", "Origin");
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, x-api-token");
+  if (req.method === "OPTIONS") {
+    return res.sendStatus(204);
+  }
+  const token = process.env.API_TOKEN;
+  if (token && req.headers["x-api-token"] !== token) {
+    return res.status(401).json({ error: "Token inválido." });
+  }
+  next();
+});
+
 app.use((req, res, next) => {
   const start = Date.now();
   const path = req.path;
